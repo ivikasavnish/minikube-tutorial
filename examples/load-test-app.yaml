@@ -1,0 +1,126 @@
+---
+# Target Application Service (Simple HTTP Server)
+apiVersion: v1
+kind: Service
+metadata:
+  name: app
+  labels:
+    app: load-test
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 8002
+    targetPort: 8000
+    protocol: TCP
+  selector:
+    app: load-test-server
+
+---
+# Target Application Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: load-test-server
+  labels:
+    app: load-test-server
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: load-test-server
+  template:
+    metadata:
+      labels:
+        app: load-test-server
+    spec:
+      containers:
+      - name: server
+        image: kennethreitz/httpbin:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: PORT
+          value: "8000"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /status/200
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /status/200
+            port: 8000
+          initialDelaySeconds: 2
+          periodSeconds: 5
+
+---
+# Load Testing Pod with Apache Bench
+apiVersion: v1
+kind: Pod
+metadata:
+  name: load-tester
+  labels:
+    app: load-test-tools
+spec:
+  restartPolicy: Never
+  containers:
+  - name: load-tester
+    image: httpd:2.4-alpine
+    command:
+      - sleep
+      - "3600"
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "100m"
+      limits:
+        memory: "128Mi"
+        cpu: "200m"
+
+---
+# Horizontal Pod Autoscaler for automatic scaling
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: load-test-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: load-test-server
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 30

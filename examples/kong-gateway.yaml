@@ -1,0 +1,236 @@
+---
+# PostgreSQL Database for Kong (Configuration Storage)
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-kong
+  labels:
+    app: postgres-kong
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5432
+    targetPort: 5432
+  selector:
+    app: postgres-kong
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-kong
+  labels:
+    app: postgres-kong
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-kong
+  template:
+    metadata:
+      labels:
+        app: postgres-kong
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15-alpine
+        env:
+        - name: POSTGRES_DB
+          value: "kong"
+        - name: POSTGRES_USER
+          value: "kong"
+        - name: POSTGRES_PASSWORD
+          value: "kong"
+        ports:
+        - containerPort: 5432
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+
+---
+# Kong API Gateway
+apiVersion: v1
+kind: Service
+metadata:
+  name: kong
+  labels:
+    app: kong
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 8000
+    targetPort: 8000
+    name: proxy
+  - port: 8443
+    targetPort: 8443
+    name: proxy-ssl
+  - port: 8001
+    targetPort: 8001
+    name: admin
+  - port: 8444
+    targetPort: 8444
+    name: admin-ssl
+  selector:
+    app: kong
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kong
+  labels:
+    app: kong
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kong
+  template:
+    metadata:
+      labels:
+        app: kong
+    spec:
+      serviceAccountName: default
+      initContainers:
+      - name: kong-init
+        image: kong:3.3-alpine
+        command:
+          - kong
+          - migrations
+          - bootstrap
+        env:
+        - name: KONG_DATABASE
+          value: "postgres"
+        - name: KONG_PG_HOST
+          value: "postgres-kong"
+        - name: KONG_PG_PORT
+          value: "5432"
+        - name: KONG_PG_USER
+          value: "kong"
+        - name: KONG_PG_PASSWORD
+          value: "kong"
+      containers:
+      - name: kong
+        image: kong:3.3-alpine
+        ports:
+        - containerPort: 8000
+          name: proxy
+        - containerPort: 8443
+          name: proxy-ssl
+        - containerPort: 8001
+          name: admin
+        - containerPort: 8444
+          name: admin-ssl
+        env:
+        - name: KONG_DATABASE
+          value: "postgres"
+        - name: KONG_PG_HOST
+          value: "postgres-kong"
+        - name: KONG_PG_PORT
+          value: "5432"
+        - name: KONG_PG_USER
+          value: "kong"
+        - name: KONG_PG_PASSWORD
+          value: "kong"
+        - name: KONG_PROXY_ACCESS_LOG
+          value: "/dev/stdout"
+        - name: KONG_ADMIN_ACCESS_LOG
+          value: "/dev/stdout"
+        - name: KONG_PROXY_ERROR_LOG
+          value: "/dev/stderr"
+        - name: KONG_ADMIN_ERROR_LOG
+          value: "/dev/stderr"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /status
+            port: 8001
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /status
+            port: 8001
+          initialDelaySeconds: 15
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 2
+
+---
+# Kong Manager UI (Optional - Admin Panel)
+apiVersion: v1
+kind: Service
+metadata:
+  name: kong-manager
+  labels:
+    app: kong-manager
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 8002
+    targetPort: 8002
+  selector:
+    app: kong
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kong-manager
+  labels:
+    app: kong-manager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kong-manager
+  template:
+    metadata:
+      labels:
+        app: kong-manager
+    spec:
+      containers:
+      - name: manager
+        image: kong/konga:latest
+        ports:
+        - containerPort: 1337
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: DB_ADAPTER
+          value: "postgres"
+        - name: DB_HOST
+          value: "postgres-kong"
+        - name: DB_USER
+          value: "kong"
+        - name: DB_PASSWORD
+          value: "kong"
+        - name: DB_DATABASE
+          value: "konga"
+        - name: NODE_PORT
+          value: "1337"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 1337
+          initialDelaySeconds: 30
+          periodSeconds: 10

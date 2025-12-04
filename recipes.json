@@ -1,0 +1,319 @@
+{
+  "recipes": [
+    {
+      "id": 1,
+      "name": "Simple Web Server (Nginx)",
+      "description": "Deploy a basic Nginx web server",
+      "category": "Web",
+      "difficulty": "Beginner",
+      "time": "2 min",
+      "yaml": "examples/simple-web-server.yaml",
+      "ports": [
+        {
+          "service": "nginx",
+          "local": 8080,
+          "container": 80
+        }
+      ],
+      "docs_url": "https://nginx.org/en/docs/",
+      "access": "kubectl port-forward svc/nginx 8080:80\nVisit: http://localhost:8080",
+      "commands": {
+        "deploy": "kubectl apply -f examples/simple-web-server.yaml",
+        "check": "kubectl get pods -l app=nginx",
+        "logs": "kubectl logs -f deployment/nginx",
+        "delete": "kubectl delete -f examples/simple-web-server.yaml"
+      }
+    },
+    {
+      "id": 2,
+      "name": "PostgreSQL Database",
+      "description": "Deploy PostgreSQL database with persistent storage",
+      "category": "Database",
+      "difficulty": "Intermediate",
+      "time": "3 min",
+      "yaml": "examples/postgres-database.yaml",
+      "ports": [
+        {
+          "service": "postgres",
+          "local": 5432,
+          "container": 5432
+        }
+      ],
+      "docs_url": "https://www.postgresql.org/docs/",
+      "access": "kubectl port-forward svc/postgres 5432:5432\nConnection: psql -h localhost -U postgres",
+      "credentials": {
+        "user": "postgres",
+        "password": "postgres123"
+      },
+      "commands": {
+        "deploy": "kubectl apply -f examples/postgres-database.yaml",
+        "check": "kubectl get pods -l app=postgres",
+        "logs": "kubectl logs -f deployment/postgres",
+        "delete": "kubectl delete -f examples/postgres-database.yaml"
+      }
+    },
+    {
+      "id": 3,
+      "name": "MongoDB NoSQL Database",
+      "description": "Deploy MongoDB document database",
+      "category": "Database",
+      "difficulty": "Intermediate",
+      "time": "3 min",
+      "yaml": "examples/mongodb-database.yaml",
+      "ports": [
+        {
+          "service": "mongodb",
+          "local": 27017,
+          "container": 27017
+        }
+      ],
+      "docs_url": "https://docs.mongodb.com/",
+      "access": "kubectl port-forward svc/mongodb 27017:27017\nConnection: mongo localhost:27017",
+      "credentials": {
+        "user": "admin",
+        "password": "admin123"
+      },
+      "commands": {
+        "deploy": "kubectl apply -f examples/mongodb-database.yaml",
+        "check": "kubectl get pods -l app=mongodb",
+        "logs": "kubectl logs -f deployment/mongodb",
+        "delete": "kubectl delete -f examples/mongodb-database.yaml"
+      }
+    },
+    {
+      "id": 4,
+      "name": "Redis Cache",
+      "description": "Deploy Redis in-memory data store",
+      "category": "Cache",
+      "difficulty": "Beginner",
+      "time": "2 min",
+      "yaml": "examples/redis-cache.yaml",
+      "ports": [
+        {
+          "service": "redis",
+          "local": 6379,
+          "container": 6379
+        }
+      ],
+      "docs_url": "https://redis.io/documentation",
+      "access": "kubectl port-forward svc/redis 6379:6379\nConnection: redis-cli -h localhost",
+      "commands": {
+        "deploy": "kubectl apply -f examples/redis-cache.yaml",
+        "check": "kubectl get pods -l app=redis",
+        "logs": "kubectl logs -f deployment/redis",
+        "delete": "kubectl delete -f examples/redis-cache.yaml"
+      }
+    },
+    {
+      "id": 5,
+      "name": "Multi-Tier Application",
+      "description": "Full-stack application (Frontend + Backend + Database)",
+      "category": "Full Stack",
+      "difficulty": "Advanced",
+      "time": "5 min",
+      "yaml": "examples/multi-service-app.yaml",
+      "ports": [
+        {
+          "service": "frontend",
+          "local": 3000,
+          "container": 3000
+        },
+        {
+          "service": "backend",
+          "local": 5000,
+          "container": 5000
+        }
+      ],
+      "docs_url": "DOCKER_DEPLOYMENT_GUIDE.md",
+      "access": "kubectl port-forward svc/frontend 3000:3000\nVisit: http://localhost:3000",
+      "commands": {
+        "deploy": "kubectl apply -f examples/multi-service-app.yaml",
+        "check": "kubectl get pods",
+        "logs": "kubectl logs -f deployment/frontend",
+        "delete": "kubectl delete -f examples/multi-service-app.yaml"
+      }
+    },
+    {
+      "id": 6,
+      "name": "RabbitMQ Message Queue",
+      "description": "Deploy RabbitMQ message broker",
+      "category": "Messaging",
+      "difficulty": "Intermediate",
+      "time": "3 min",
+      "yaml": "examples/rabbitmq-queue.yaml",
+      "ports": [
+        {
+          "service": "rabbitmq",
+          "local": 5672,
+          "container": 5672
+        },
+        {
+          "service": "rabbitmq-management",
+          "local": 15672,
+          "container": 15672
+        }
+      ],
+      "docs_url": "https://www.rabbitmq.com/documentation.html",
+      "access": "kubectl port-forward svc/rabbitmq 5672:5672\nManagement: http://localhost:15672 (admin/admin)",
+      "credentials": {
+        "user": "admin",
+        "password": "admin"
+      },
+      "commands": {
+        "deploy": "kubectl apply -f examples/rabbitmq-queue.yaml",
+        "check": "kubectl get pods -l app=rabbitmq",
+        "logs": "kubectl logs -f deployment/rabbitmq",
+        "delete": "kubectl delete -f examples/rabbitmq-queue.yaml"
+      }
+    },
+    {
+      "id": 7,
+      "name": "Application with Logging",
+      "description": "Application with structured logging setup",
+      "category": "Logging",
+      "difficulty": "Intermediate",
+      "time": "3 min",
+      "yaml": "examples/logging-example.yaml",
+      "ports": [
+        {
+          "service": "app",
+          "local": 8000,
+          "container": 8000
+        }
+      ],
+      "docs_url": "HELM_PACKAGES_GUIDE.md",
+      "access": "kubectl port-forward svc/app 8000:8000\nLogs: kubectl logs -f deployment/app",
+      "commands": {
+        "deploy": "kubectl apply -f examples/logging-example.yaml",
+        "check": "kubectl get pods -l app=logging-app",
+        "logs": "kubectl logs -f deployment/app",
+        "delete": "kubectl delete -f examples/logging-example.yaml"
+      }
+    },
+    {
+      "id": 8,
+      "name": "Application with Tracing",
+      "description": "Application with distributed tracing setup",
+      "category": "Tracing",
+      "difficulty": "Intermediate",
+      "time": "3 min",
+      "yaml": "examples/tracing-example.yaml",
+      "ports": [
+        {
+          "service": "app",
+          "local": 8001,
+          "container": 8001
+        }
+      ],
+      "docs_url": "HELM_PACKAGES_GUIDE.md",
+      "access": "kubectl port-forward svc/app 8001:8001\nTracing: kubectl port-forward svc/jaeger-query 16686:16686",
+      "commands": {
+        "deploy": "kubectl apply -f examples/tracing-example.yaml",
+        "check": "kubectl get pods -l app=tracing-app",
+        "logs": "kubectl logs -f deployment/app",
+        "delete": "kubectl delete -f examples/tracing-example.yaml"
+      }
+    },
+    {
+      "id": 9,
+      "name": "Load Testing Application",
+      "description": "Deploy application with load testing tools",
+      "category": "Testing",
+      "difficulty": "Intermediate",
+      "time": "4 min",
+      "yaml": "examples/load-test-app.yaml",
+      "ports": [
+        {
+          "service": "app",
+          "local": 8002,
+          "container": 8002
+        }
+      ],
+      "docs_url": "https://kubernetes.io/docs/",
+      "access": "kubectl port-forward svc/app 8002:8002\nTest: ab -n 1000 -c 10 http://localhost:8002",
+      "commands": {
+        "deploy": "kubectl apply -f examples/load-test-app.yaml",
+        "check": "kubectl get pods -l app=load-test",
+        "metrics": "kubectl top pods",
+        "delete": "kubectl delete -f examples/load-test-app.yaml"
+      }
+    },
+    {
+      "id": 10,
+      "name": "Stateful Application (Redis Cluster)",
+      "description": "Deploy Redis with StatefulSet for persistence",
+      "category": "Stateful",
+      "difficulty": "Advanced",
+      "time": "5 min",
+      "yaml": "examples/redis-statefulset.yaml",
+      "ports": [
+        {
+          "service": "redis",
+          "local": 6379,
+          "container": 6379
+        }
+      ],
+      "docs_url": "https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/",
+      "access": "kubectl port-forward svc/redis 6379:6379\nConnection: redis-cli -h localhost",
+      "commands": {
+        "deploy": "kubectl apply -f examples/redis-statefulset.yaml",
+        "check": "kubectl get statefulsets",
+        "logs": "kubectl logs -f statefulset/redis",
+        "delete": "kubectl delete -f examples/redis-statefulset.yaml"
+      }
+    },
+    {
+      "id": 11,
+      "name": "CI/CD Pipeline (Jenkins)",
+      "description": "Deploy Jenkins for continuous integration",
+      "category": "CI/CD",
+      "difficulty": "Advanced",
+      "time": "5 min",
+      "yaml": "examples/jenkins-cicd.yaml",
+      "ports": [
+        {
+          "service": "jenkins",
+          "local": 8080,
+          "container": 8080
+        }
+      ],
+      "docs_url": "https://www.jenkins.io/doc/",
+      "access": "kubectl port-forward svc/jenkins 8080:8080\nUI: http://localhost:8080",
+      "commands": {
+        "deploy": "kubectl apply -f examples/jenkins-cicd.yaml",
+        "check": "kubectl get pods -l app=jenkins",
+        "logs": "kubectl logs -f deployment/jenkins",
+        "delete": "kubectl delete -f examples/jenkins-cicd.yaml"
+      }
+    },
+    {
+      "id": 12,
+      "name": "API Gateway with Kong",
+      "description": "Deploy Kong API Gateway for managing microservices",
+      "category": "API",
+      "difficulty": "Advanced",
+      "time": "4 min",
+      "yaml": "examples/kong-gateway.yaml",
+      "ports": [
+        {
+          "service": "kong",
+          "local": 8000,
+          "container": 8000
+        },
+        {
+          "service": "kong-admin",
+          "local": 8001,
+          "container": 8001
+        }
+      ],
+      "docs_url": "https://docs.konghq.com/",
+      "access": "kubectl port-forward svc/kong 8000:8000\nAdmin API: http://localhost:8001",
+      "commands": {
+        "deploy": "kubectl apply -f examples/kong-gateway.yaml",
+        "check": "kubectl get pods -l app=kong",
+        "logs": "kubectl logs -f deployment/kong",
+        "delete": "kubectl delete -f examples/kong-gateway.yaml"
+      }
+    }
+  ]
+}

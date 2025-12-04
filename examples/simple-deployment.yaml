@@ -1,0 +1,125 @@
+# Simple Nginx Deployment Example
+# This is a basic example for deploying Nginx on Minikube
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+  labels:
+    app: nginx
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+    name: http
+  selector:
+    app: nginx
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+    version: "1.0"
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+      annotations:
+        description: "Simple Nginx web server"
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:latest
+        ports:
+        - containerPort: 80
+          name: http
+          protocol: TCP
+
+        # Resource requests and limits
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "128Mi"
+            cpu: "200m"
+
+        # Health checks
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 2
+
+        # Environment variables
+        env:
+        - name: ENVIRONMENT
+          value: "minikube"
+
+        # Volume mounts (example)
+        volumeMounts:
+        - name: config
+          mountPath: /etc/nginx/conf.d
+          readOnly: true
+
+      # Volumes
+      volumes:
+      - name: config
+        configMap:
+          name: nginx-config
+          optional: true
+
+      # Pod settings
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  labels:
+    app: nginx
+data:
+  custom.conf: |
+    server {
+      listen 80;
+      server_name _;
+
+      location / {
+        root /usr/share/nginx/html;
+        index index.html;
+      }
+
+      location /health {
+        access_log off;
+        return 200 "healthy\n";
+        add_header Content-Type text/plain;
+      }
+    }

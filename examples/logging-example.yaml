@@ -1,0 +1,163 @@
+# Logging Example
+# Demonstrates structured logging with JSON output
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: logging-app
+spec:
+  selector:
+    app: logging-app
+  ports:
+  - port: 8080
+    targetPort: 8080
+    name: http
+  type: LoadBalancer
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: logging-app
+  labels:
+    app: logging-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: logging-app
+  template:
+    metadata:
+      labels:
+        app: logging-app
+      annotations:
+        logging: "enabled"
+        log-level: "INFO"
+    spec:
+      containers:
+      - name: app
+        image: python:3.9
+        command: ["python", "-c"]
+        args:
+        - |
+          import json
+          import time
+          import logging
+          from datetime import datetime
+          from http.server import HTTPServer, BaseHTTPRequestHandler
+          import sys
+
+          # Setup JSON logging
+          class JSONFormatter(logging.Formatter):
+              def format(self, record):
+                  log_data = {
+                      "timestamp": datetime.utcnow().isoformat(),
+                      "level": record.levelname,
+                      "logger": record.name,
+                      "message": record.getMessage(),
+                      "module": record.module,
+                      "function": record.funcName,
+                      "line": record.lineno
+                  }
+                  if record.exc_info:
+                      log_data["exception"] = self.formatException(record.exc_info)
+                  return json.dumps(log_data)
+
+          # Configure logging
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          handler = logging.StreamHandler(sys.stdout)
+          handler.setFormatter(JSONFormatter())
+          logger.addHandler(handler)
+
+          # Simple HTTP server
+          class RequestHandler(BaseHTTPRequestHandler):
+              def do_GET(self):
+                  logger.info(f"Received request: {self.path}")
+
+                  if self.path == '/':
+                      self.send_response(200)
+                      self.send_header('Content-type', 'text/html')
+                      self.end_headers()
+                      self.wfile.write(b"Logging App Running")
+                  elif self.path == '/health':
+                      self.send_response(200)
+                      self.send_header('Content-type', 'application/json')
+                      self.end_headers()
+                      self.wfile.write(json.dumps({"status": "healthy"}).encode())
+                  else:
+                      self.send_response(404)
+                      self.end_headers()
+
+              def log_message(self, format, *args):
+                  # Override to use our logger
+                  pass
+
+          server = HTTPServer(('0.0.0.0', 8080), RequestHandler)
+          logger.info("Starting logging app server on port 8080")
+
+          # Background logging
+          import threading
+          def background_logger():
+              counter = 0
+              while True:
+                  time.sleep(5)
+                  counter += 1
+                  logger.info(f"Background update #{counter}")
+
+          thread = threading.Thread(target=background_logger, daemon=True)
+          thread.start()
+
+          server.serve_forever()
+
+        ports:
+        - containerPort: 8080
+          name: http
+
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+
+        env:
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: ENVIRONMENT
+          value: "minikube"
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+
+---
+# ConfigMap for log configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: logging-config
+data:
+  log-level: "INFO"
+  log-format: "json"
+  log-rotation-days: "7"

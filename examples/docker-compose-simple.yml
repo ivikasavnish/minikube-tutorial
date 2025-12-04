@@ -1,0 +1,51 @@
+# Simple Docker Compose Example
+# Deploy with Minikube: docker-to-minikube.sh
+
+version: '3.8'
+
+services:
+  # Nginx web server
+  web:
+    image: nginx:latest
+    container_name: my_web_app
+    ports:
+      - "80:80"
+    environment:
+      - NGINX_HOST=localhost
+      - NGINX_PORT=80
+    volumes:
+      - ./html:/usr/share/nginx/html:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - app-network
+
+  # Redis cache service
+  redis:
+    image: redis:7-alpine
+    container_name: my_redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  redis_data:

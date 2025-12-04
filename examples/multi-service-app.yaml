@@ -1,0 +1,364 @@
+# Multi-Service Application Example
+# This demonstrates a complete application with Frontend, Backend, and Database
+
+---
+# Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: myapp
+  labels:
+    name: myapp
+
+---
+# ConfigMap for application configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: myapp
+data:
+  APP_ENV: "production"
+  LOG_LEVEL: "INFO"
+  DATABASE_HOST: "postgres-service"
+  DATABASE_PORT: "5432"
+  BACKEND_URL: "http://backend-service:5000"
+
+---
+# Secret for sensitive data (Base64 encoded)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: app-secrets
+  namespace: myapp
+type: Opaque
+stringData:
+  DATABASE_USER: "postgres"
+  DATABASE_PASSWORD: "yourpassword123"
+  API_KEY: "secret-api-key-12345"
+
+---
+# Backend Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+  namespace: myapp
+  labels:
+    app: backend
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5000
+    targetPort: 5000
+    name: http
+  selector:
+    app: backend
+
+---
+# Backend Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: myapp
+  labels:
+    app: backend
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+      annotations:
+        description: "Backend API service"
+    spec:
+      containers:
+      - name: backend
+        image: python:3.9
+        command: ["python", "-m", "http.server"]
+        args: ["5000"]
+        ports:
+        - containerPort: 5000
+          name: http
+
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+
+        envFrom:
+        - configMapRef:
+            name: app-config
+        - secretRef:
+            name: app-secrets
+
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 5000
+          initialDelaySeconds: 15
+          periodSeconds: 20
+
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 5000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+
+---
+# Frontend Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+  namespace: myapp
+  labels:
+    app: frontend
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 3000
+    name: http
+  selector:
+    app: frontend
+
+---
+# Frontend Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: myapp
+  labels:
+    app: frontend
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+      annotations:
+        description: "Frontend web application"
+    spec:
+      containers:
+      - name: frontend
+        image: nginx:latest
+        ports:
+        - containerPort: 3000
+          name: http
+
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+
+        env:
+        - name: BACKEND_API
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: BACKEND_URL
+
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 15
+
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+
+---
+# Database Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: myapp
+  labels:
+    app: postgres
+spec:
+  type: ClusterIP
+  clusterIP: None  # Headless service for StatefulSet
+  ports:
+  - port: 5432
+    targetPort: 5432
+    name: postgres
+  selector:
+    app: postgres
+
+---
+# Database StatefulSet (for stateful applications)
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: myapp
+  labels:
+    app: postgres
+spec:
+  serviceName: postgres-service
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:13
+        ports:
+        - containerPort: 5432
+          name: postgres
+
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "200m"
+
+        env:
+        - name: POSTGRES_DB
+          value: "myappdb"
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: DATABASE_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: DATABASE_PASSWORD
+
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data
+          subPath: postgres
+
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pg_isready -U postgres
+          initialDelaySeconds: 30
+          periodSeconds: 10
+
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pg_isready -U postgres
+          initialDelaySeconds: 5
+          periodSeconds: 5
+
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-storage
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: standard
+      resources:
+        requests:
+          storage: 1Gi
+
+---
+# Horizontal Pod Autoscaler for Backend
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: backend-hpa
+  namespace: myapp
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: backend
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+
+---
+# Network Policy (optional - restrict traffic)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: app-network-policy
+  namespace: myapp
+spec:
+  podSelector:
+    matchLabels:
+      app: backend
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: frontend
+    ports:
+    - protocol: TCP
+      port: 5000
+
+---
+# Resource Quota for namespace
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: myapp-quota
+  namespace: myapp
+spec:
+  hard:
+    requests.cpu: "2"
+    requests.memory: "1Gi"
+    limits.cpu: "4"
+    limits.memory: "2Gi"
+    pods: "20"
+    services: "10"
+    services.loadbalancers: "2"
