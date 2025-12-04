@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 #############################################################################
 # 📋 Minikube Recipes - Ready-to-Deploy Application Templates
